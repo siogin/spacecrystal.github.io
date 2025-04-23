@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Space Crystal</title>
+    <style>
+        :root {
+            --primary: #00f7ff;
+            --secondary: #ff00f7;
+            --accent: #f7ff00;
+            --dark: #0a0a1a;
+            --light: #ffffff;
+            --glass: rgba(255, 255, 255, 0.1);
+            --neon-glow: 0 0 15px currentColor;
+            --ship-color: #ff00a2;
+        }
+        
+        @font-face {
+            font-family: 'Orbitron';
+            src: url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--dark);
+            font-family: 'Orbitron', sans-serif;
+            color: var(--light);
+            touch-action: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        #gameCanvas {
+            display: block;
+            background: radial-gradient(ellipse at center, #1a1a3a 0%, #0a0a1a 100%);
+        }
+        
+        /* Современный UI с неоновым стилем */
+        .ui-panel {
+            position: absolute;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 12px 16px;
+            z-index: 10;
+        }
+        
+        #gameUI {
+            top: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .score-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        
+        .score-value {
+            font-size: 16px;
+            color: var(--primary);
+            text-shadow: var(--neon-glow);
+        }
+        
+        #newRecord {
+            background: linear-gradient(45deg, var(--accent), #ff9100);
+            color: black;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 6px;
+            display: none;
+            animation: pulse 1.5s infinite;
+        }
+        
+        #freezeTimer {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--primary);
+            font-size: 14px;
+            font-weight: bold;
+            padding: 8px 16px;
+            display: none;
+            text-shadow: var(--neon-glow);
+            animation: freezeGlow 1s infinite alternate;
+        }
+        
+        /* Кнопки с неоновым эффектом */
+        .neon-button {
+            position: relative;
+            padding: 14px 28px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            background: transparent;
+            border: none;
+            border-radius: 50px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 1;
+        }
+        
+        .neon-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            z-index: -1;
+            opacity: 0.7;
+            transition: all 0.3s;
+        }
+        
+        .neon-button::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            right: 2px;
+            bottom: 2px;
+            background: var(--dark);
+            border-radius: 50px;
+            z-index: -1;
+        }
+        
+        .neon-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 247, 255, 0.4);
+        }
+        
+        .neon-button:active {
+            transform: translateY(0);
+        }
+        
+        .neon-button:hover::before {
+            opacity: 1;
+        }
+        
+        /* Экраны игры */
+        .game-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(ellipse at center, rgba(10, 10, 26, 0.9) 0%, rgba(5, 5, 15, 0.95) 100%);
+            z-index: 20;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        
+        #startScreen {
+            display: flex;
+        }
+        
+        #gameOverScreen, #pauseScreen {
+            display: none;
+        }
+        
+        /* Анимации */
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        @keyframes freezeGlow {
+            0% { text-shadow: 0 0 10px var(--primary); }
+            100% { text-shadow: 0 0 20px var(--primary); }
+        }
+        
+        /* Главный заголовок */
+        .game-title {
+            font-size: 42px;
+            margin-bottom: 30px;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 20px rgba(0, 247, 255, 0.3);
+            letter-spacing: 2px;
+            position: relative;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .game-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(to right, transparent, var(--primary), transparent);
+            border-radius: 3px;
+        }
+        
+        /* Логотип */
+        .logo-container {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 30px;
+            position: relative;
+            animation: float 4s ease-in-out infinite;
+        }
+        
+        .logo-core {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+            border-radius: 50%;
+            opacity: 0.3;
+            filter: blur(10px);
+        }
+        
+        .logo-crystal {
+            position: absolute;
+            width: 60%;
+            height: 60%;
+            top: 20%;
+            left: 20%;
+            transform: rotate(0deg);
+            animation: spin 8s linear infinite;
+        }
+        
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Инструкции */
+        .instructions {
+            max-width: 300px;
+            margin: 20px 0 0;
+            font-size: 14px;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.7);
+            text-shadow: 0 0 5px rgba(0, 247, 255, 0.3);
+        }
+        
+        /* Кнопка паузы */
+        #pauseButton {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: none;
+            z-index: 10;
+        }
+        
+        /* Адаптация для мобильных */
+        @media (max-width: 600px) {
+            .game-title {
+                font-size: 32px;
+            }
+            
+            .logo-container {
+                width: 90px;
+                height: 90px;
+            }
+            
+            .neon-button {
+                padding: 12px 24px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="gameUI" class="ui-panel">
+        <div class="score-display">
+            <span>SCORE:</span>
+            <span class="score-value" id="score">0</span>
+        </div>
+        <div class="score-display">
+            <span>BEST:</span>
+            <span class="score-value" id="highScore">0</span>
+            <span id="newRecord">NEW!</span>
+        </div>
+    </div>
+    
+    <div id="freezeTimer" class="ui-panel">FREEZE MODE</div>
+    
+    <button id="pauseButton" class="neon-button">⏸</button>
+    
+    <div id="startScreen" class="game-screen">
+        <div class="logo-container">
+            <div class="logo-core"></div>
+            <div class="logo-crystal"></div>
+        </div>
+        <h1 class="game-title">SPACE CRYSTAL</h1>
+        <button id="startButton" class="neon-button">START GAME</button>
+        <div class="instructions">
+            Touch or click to move your ship<br>
+            Collect crystals and avoid asteroids<br>
+            Catch snowflakes for special powers
+        </div>
+    </div>
+    
+    <div id="gameOverScreen" class="game-screen">
+        <h1 class="game-title">GAME OVER</h1>
+        <div class="score-value" id="finalScore">0</div>
+        <button id="restartButton" class="neon-button">PLAY AGAIN</button>
+    </div>
+    
+    <div id="pauseScreen" class="game-screen">
+        <h1 class="game-title">PAUSED</h1>
+        <button id="resumeButton" class="neon-button">RESUME</button>
+    </div>
+
+    <script>
+        // Проверка на запуск в Telegram WebApp
+        function isTelegramWebApp() {
+            return window.Telegram && window.Telegram.WebApp;
+        }
+        
+        // Активация полноэкранного режима в Telegram WebApp
+        function expandTelegramWebApp() {
+            if (isTelegramWebApp()) {
+                Telegram.WebApp.expand();
+                Telegram.WebApp.enableClosingConfirmation();
+                Telegram.WebApp.setHeaderColor('#0a0a1a');
+                Telegram.WebApp.setBackgroundColor('#0a0a1a');
+            }
+        }
+        
+        // Инициализация игры
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const highScoreElement = document.getElementById('highScore');
+        const newRecordElement = document.getElementById('newRecord');
+        const startScreen = document.getElementById('startScreen');
+        const startButton = document.getElementById('startButton');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreElement = document.getElementById('finalScore');
+        const restartButton = document.getElementById('restartButton');
+        const pauseButton = document.getElementById('pauseButton');
+        const pauseScreen = document.getElementById('pauseScreen');
+        const resumeButton = document.getElementById('resumeButton');
+        const freezeTimerElement = document.getElementById('freezeTimer');
+        
+        // Размеры canvas
+        function resizeCanvas() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            // Для Telegram WebApp учитываем область под кнопки
+            if (isTelegramWebApp() && Telegram.WebApp.platform !== 'unknown') {
+                canvas.width = width;
+                canvas.height = height - Telegram.WebApp.viewportStableHeight;
+            } else {
+                canvas.width = width;
+                canvas.height = height;
+            }
+        }
+        resizeCanvas();
+        
+        // Игровые переменные
+        let score = 0;
+        let highScore = localStorage.getItem('highScore') || 0;
+        let gameRunning = false;
+        let isPaused = false;
+        let animationId;
+        let freezeTimeLeft = 0;
+        let freezeTimer;
+        let specialSnowflake = null;
+        let snowflakeSpawnTimer = 0;
+        let lastFrameTime = 0;
+        
+        // Игровые объекты
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            width: 30,
+            height: 50,
+            color: '#ff00a2',
+            speed: 3,
+            dx: 0,
+            dy: 0,
+            isMoving: false,
+            enginePower: 0
+        };
+        
+        const crystals = [];
+        const asteroids = [];
+        const particles = [];
+        const stars = [];
+        const nebulas = [];
+        
+        // Создание фоновых элементов
+        function createBackground() {
+            // Звезды
+            for (let i = 0; i < 150; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 1.5,
+                    alpha: 0.3 + Math.random() * 0.7,
+                    speed: 0.05 + Math.random() * 0.3,
+                    twinkle: Math.random() * 5
+                });
+            }
+            
+            // Туманности
+            for (let i = 0; i < 3; i++) {
+                nebulas.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: 100 + Math.random() * 200,
+                    color: `hsla(${Math.floor(Math.random() * 360)}, 80%, 60%, 0.05)`,
+                    rotation: Math.random() * Math.PI * 2
+                });
+            }
+        }
+        
+        // Создание кристалла
+        function createCrystal() {
+            const size = 10 + Math.random() * 15;
+            let x, y;
+            
+            if (Math.random() < 0.5) {
+                x = Math.random() < 0.5 ? -size : canvas.width + size;
+                y = Math.random() * canvas.height;
+            } else {
+                x = Math.random() * canvas.width;
+                y = Math.random() < 0.5 ? -size : canvas.height + size;
+            }
+            
+            const hue = Math.random() * 360;
+            const saturation = 70 + Math.random() * 20;
+            const lightness = 50 + Math.random() * 20;
+            
+            crystals.push({
+                x,
+                y,
+                size,
+                color: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+                glowColor: `hsla(${hue}, ${saturation}%, ${lightness}%, 0.3)`,
+                speed: 0.8 + Math.random() * 1.5,
+                dx: (player.x - x) / (150 + Math.random() * 100),
+                dy: (player.y - y) / (150 + Math.random() * 100),
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: (Math.random() - 0.5) * 0.05,
+                isFrozen: false,
+                hue: hue,
+                saturation: saturation,
+                lightness: lightness,
+                highlightAngle: Math.random() * Math.PI * 2
+            });
+        }
+        
+        // Создание астероида
+        function createAsteroid() {
+            const size = 15 + Math.random() * 25;
+            let x, y;
+            
+            if (Math.random() < 0.5) {
+                x = Math.random() < 0.5 ? -size : canvas.width + size;
+                y = Math.random() * canvas.height;
+            } else {
+                x = Math.random() * canvas.width;
+                y = Math.random() < 0.5 ? -size : canvas.height + size;
+            }
+            
+            const angleToPlayer = Math.atan2(player.y - y, player.x - x);
+            const deviation = (Math.random() - 0.5) * Math.PI / 2;
+            const speed = 0.8 + Math.random() * 1.5;
+            
+            const asteroid = {
+                x,
+                y,
+                size,
+                color: '#555',
+                speed,
+                dx: Math.cos(angleToPlayer + deviation) * speed,
+                dy: Math.sin(angleToPlayer + deviation) * speed,
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: (Math.random() - 0.5) * 0.03,
+                points: [],
+                isFrozen: false,
+                isDestroyable: false
+            };
+            
+            // Создаем более реалистичную форму астероида
+            const pointsCount = 8 + Math.floor(Math.random() * 6);
+            for (let i = 0; i < pointsCount; i++) {
+                const angle = (i / pointsCount) * Math.PI * 2;
+                const distance = size * 0.6 + Math.random() * size * 0.4;
+                asteroid.points.push({
+                    x: Math.cos(angle) * distance,
+                    y: Math.sin(angle) * distance
+                });
+            }
+            
+            asteroids.push(asteroid);
+        }
+        
+        // Создание специальной снежинки
+        function createSpecialSnowflake() {
+            if (specialSnowflake) return;
+            
+            let x, y;
+            
+            if (Math.random() < 0.5) {
+                x = Math.random() < 0.5 ? -20 : canvas.width + 20;
+                y = Math.random() * canvas.height;
+            } else {
+                x = Math.random() * canvas.width;
+                y = Math.random() < 0.5 ? -20 : canvas.height + 20;
+            }
+            
+            const targetX = canvas.width / 2 + (Math.random() - 0.5) * canvas.width * 0.5;
+            const targetY = canvas.height / 2 + (Math.random() - 0.5) * canvas.height * 0.5;
+            const angle = Math.atan2(targetY - y, targetX - x);
+            const speed = 3;
+            
+            specialSnowflake = {
+                x,
+                y,
+                size: 12,
+                dx: Math.cos(angle) * speed,
+                dy: Math.sin(angle) * speed,
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 0.1,
+                alpha: 0,
+                fadingIn: true
+            };
+        }
+        
+        // Создание частиц
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x,
+                    y,
+                    size: 1 + Math.random() * 3,
+                    color,
+                    dx: (Math.random() - 0.5) * 4,
+                    dy: (Math.random() - 0.5) * 4,
+                    life: 20 + Math.random() * 30,
+                    alpha: 1,
+                    rotation: Math.random() * Math.PI * 2,
+                    rotationSpeed: (Math.random() - 0.5) * 0.1
+                });
+            }
+        }
+        
+        // Активация режима заморозки
+        function activateFreezeMode() {
+            freezeTimeLeft = 10;
+            
+            crystals.forEach(crystal => {
+                crystal.isFrozen = true;
+                crystal.dx *= 0.1;
+                crystal.dy *= 0.1;
+                crystal.rotationSpeed *= 0.1;
+                crystal.color = `hsl(${crystal.hue}, ${crystal.saturation}%, 80%)`;
+                crystal.glowColor = `hsla(${crystal.hue}, ${crystal.saturation}%, 80%, 0.5)`;
+            });
+            
+            asteroids.forEach(asteroid => {
+                asteroid.isFrozen = true;
+                asteroid.isDestroyable = true;
+                asteroid.dx *= 0.1;
+                asteroid.dy *= 0.1;
+                asteroid.rotationSpeed *= 0.1;
+                asteroid.color = '#00a0ff';
+            });
+            
+            freezeTimerElement.style.display = 'block';
+            updateFreezeTimer();
+            
+            clearInterval(freezeTimer);
+            freezeTimer = setInterval(() => {
+                freezeTimeLeft--;
+                updateFreezeTimer();
+                
+                if (freezeTimeLeft <= 0) {
+                    deactivateFreezeMode();
+                    clearInterval(freezeTimer); // Важно очистить интервал
+                }
+            }, 1000);
+        }
+        
+        // Деактивация режима заморозки
+        function deactivateFreezeMode() {
+            clearInterval(freezeTimer);
+            freezeTimeLeft = 0;
+            freezeTimerElement.style.display = 'none';
+            
+            crystals.forEach(crystal => {
+                crystal.isFrozen = false;
+                crystal.dx *= 10;
+                crystal.dy *= 10;
+                crystal.rotationSpeed *= 10;
+                crystal.color = `hsl(${crystal.hue}, ${crystal.saturation}%, ${crystal.lightness}%)`;
+                crystal.glowColor = `hsla(${crystal.hue}, ${crystal.saturation}%, ${crystal.lightness}%, 0.3)`;
+            });
+            
+            asteroids.forEach(asteroid => {
+                asteroid.isFrozen = false;
+                asteroid.isDestroyable = false;
+                asteroid.dx *= 10;
+                asteroid.dy *= 10;
+                asteroid.rotationSpeed *= 10;
+                asteroid.color = '#555';
+            });
+        }
+        
+        // Обновление таймера заморозки
+        function updateFreezeTimer() {
+            freezeTimerElement.textContent = `FREEZE: ${freezeTimeLeft}S`;
+        }
+        
+        // Обработка ввода
+        function handleInputStart(e) {
+            e.preventDefault();
+            let clientX, clientY;
+            
+            if (e.type.includes('touch')) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            const rect = canvas.getBoundingClientRect();
+            const targetX = clientX - rect.left;
+            const targetY = clientY - rect.top;
+            
+            const dx = targetX - player.x;
+            const dy = targetY - player.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > 5) {
+                player.dx = dx / distance * player.speed;
+                player.dy = dy / distance * player.speed;
+                player.isMoving = true;
+            }
+        }
+        
+        function handleInputMove(e) {
+            if (!player.isMoving) return;
+            e.preventDefault();
+            
+            let clientX, clientY;
+            
+            if (e.type.includes('touch')) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            const rect = canvas.getBoundingClientRect();
+            const targetX = clientX - rect.left;
+            const targetY = clientY - rect.top;
+            
+            const dx = targetX - player.x;
+            const dy = targetY - player.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > 5) {
+                player.dx = dx / distance * player.speed;
+                player.dy = dy / distance * player.speed;
+            }
+        }
+        
+        function handleInputEnd() {
+            player.isMoving = false;
+            player.dx = 0;
+            player.dy = 0;
+            player.enginePower = 0;
+        }
+        
+        // Обновление игрового состояния
+        function update(timestamp) {
+            if (isPaused) return;
+            
+            const deltaTime = timestamp - lastFrameTime;
+            lastFrameTime = timestamp;
+            
+            if (deltaTime > 100) return;
+            
+            // Обновление двигателя игрока
+            if (player.isMoving) {
+                player.enginePower = Math.min(1, player.enginePower + 0.05);
+            } else {
+                player.enginePower = Math.max(0, player.enginePower - 0.05);
+            }
+            
+            player.x += player.dx;
+            player.y += player.dy;
+            
+            player.x = Math.max(player.width/2, Math.min(canvas.width - player.width/2, player.x));
+            player.y = Math.max(player.height/2, Math.min(canvas.height - player.height/2, player.y));
+            
+            // Обновление кристаллов
+            for (let i = crystals.length - 1; i >= 0; i--) {
+                const crystal = crystals[i];
+                
+                if (!crystal.isFrozen) {
+                    const dx = player.x - crystal.x;
+                    const dy = player.y - crystal.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 200) {
+                        crystal.dx += dx / distance * 0.01;
+                        crystal.dy += dy / distance * 0.01;
+                    }
+                    
+                    const speed = Math.sqrt(crystal.dx * crystal.dx + crystal.dy * crystal.dy);
+                    if (speed > crystal.speed) {
+                        crystal.dx = (crystal.dx / speed) * crystal.speed;
+                        crystal.dy = (crystal.dy / speed) * crystal.speed;
+                    }
+                }
+                
+                crystal.x += crystal.dx;
+                crystal.y += crystal.dy;
+                crystal.rotation += crystal.rotationSpeed;
+                crystal.highlightAngle += 0.02;
+                
+                const playerDist = Math.sqrt(
+                    Math.pow(player.x - crystal.x, 2) + 
+                    Math.pow(player.y - crystal.y, 2)
+                );
+                
+                if (playerDist < player.width/2 + crystal.size / 2) {
+                    const points = freezeTimeLeft > 0 ? Math.floor(crystal.size) * 3 : Math.floor(crystal.size);
+                    score += points;
+                    scoreElement.textContent = score;
+                    
+                    // Создаем частицы в форме кристалла
+                    for (let j = 0; j < 10; j++) {
+                        particles.push({
+                            x: crystal.x,
+                            y: crystal.y,
+                            size: 2 + Math.random() * 3,
+                            color: crystal.color,
+                            dx: (Math.random() - 0.5) * 4,
+                            dy: (Math.random() - 0.5) * 4,
+                            life: 30 + Math.random() * 30,
+                            alpha: 1,
+                            rotation: Math.random() * Math.PI * 2,
+                            rotationSpeed: (Math.random() - 0.5) * 0.1,
+                            isCrystal: true,
+                            crystalSize: crystal.size * 0.2 + Math.random() * crystal.size * 0.3
+                        });
+                    }
+                    
+                    crystals.splice(i, 1);
+                    
+                    if (Math.random() < 0.7) {
+                        createCrystal();
+                    }
+                    
+                    continue;
+                }
+                
+                if (crystal.x < -100 || crystal.x > canvas.width + 100 || 
+                    crystal.y < -100 || crystal.y > canvas.height + 100) {
+                    crystals.splice(i, 1);
+                    createCrystal();
+                }
+            }
+            
+            // Обновление астероидов
+            for (let i = asteroids.length - 1; i >= 0; i--) {
+                const asteroid = asteroids[i];
+                
+                asteroid.x += asteroid.dx;
+                asteroid.y += asteroid.dy;
+                asteroid.rotation += asteroid.rotationSpeed;
+                
+                const playerDist = Math.sqrt(
+                    Math.pow(player.x - asteroid.x, 2) + 
+                    Math.pow(player.y - asteroid.y, 2)
+                );
+                
+                if (playerDist < player.width/2 + asteroid.size / 2) {
+                    if (freezeTimeLeft > 0 && asteroid.isDestroyable) {
+                        const points = Math.floor(asteroid.size) * 5; // Больше очков за астероиды
+                        score += points;
+                        scoreElement.textContent = score;
+                        
+                        createParticles(asteroid.x, asteroid.y, '#00f7ff', 15);
+                        asteroids.splice(i, 1);
+                        
+                        if (Math.random() < 0.5) {
+                            createAsteroid();
+                        }
+                    } else if (freezeTimeLeft <= 0) {
+                        gameOver();
+                        return;
+                    }
+                }
+                
+                if (asteroid.x < -200 || asteroid.x > canvas.width + 200 || 
+                    asteroid.y < -200 || asteroid.y > canvas.height + 200) {
+                    asteroids.splice(i, 1);
+                    
+                    if (Math.random() < 0.5) {
+                        createAsteroid();
+                    }
+                }
+            }
+            
+            // Обновление снежинки
+            if (specialSnowflake) {
+                specialSnowflake.x += specialSnowflake.dx;
+                specialSnowflake.y += specialSnowflake.dy;
+                specialSnowflake.rotation += specialSnowflake.rotationSpeed;
+                
+                if (specialSnowflake.fadingIn) {
+                    specialSnowflake.alpha += 0.05;
+                    if (specialSnowflake.alpha >= 1) {
+                        specialSnowflake.fadingIn = false;
+                    }
+                }
+                
+                const playerDist = Math.sqrt(
+                    Math.pow(player.x - specialSnowflake.x, 2) + 
+                    Math.pow(player.y - specialSnowflake.y, 2)
+                );
+                
+                if (playerDist < player.width/2 + specialSnowflake.size) {
+                    activateFreezeMode();
+                    createParticles(specialSnowflake.x, specialSnowflake.y, '#00f7ff', 20);
+                    specialSnowflake = null;
+                    snowflakeSpawnTimer = 0;
+                }
+                
+                if (specialSnowflake.x < -50 || specialSnowflake.x > canvas.width + 50 || 
+                    specialSnowflake.y < -50 || specialSnowflake.y > canvas.height + 50) {
+                    specialSnowflake = null;
+                    snowflakeSpawnTimer = 0;
+                }
+            } else {
+                if (gameRunning) {
+                    snowflakeSpawnTimer += deltaTime / 1000;
+                    
+                    if (snowflakeSpawnTimer > 30 + Math.random() * 30) {
+                        createSpecialSnowflake();
+                    }
+                }
+            }
+            
+            // Обновление частиц
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                
+                p.x += p.dx;
+                p.y += p.dy;
+                p.life--;
+                p.alpha = p.life / 40;
+                p.rotation += p.rotationSpeed;
+                
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+            
+            // Обновление звезд
+            stars.forEach(star => {
+                star.twinkle += 0.02;
+                star.alpha = 0.3 + Math.sin(star.twinkle) * 0.4;
+            });
+            
+            // Создание новых объектов
+            if (Math.random() < 0.015 && crystals.length < 10) {
+                createCrystal();
+            }
+            
+            if (Math.random() < 0.01 && asteroids.length < 3 + Math.floor(score / 100)) {
+                createAsteroid();
+            }
+        }
+        
+        // Функция для рисования кристалла
+        function drawCrystal(x, y, size, color, rotation, highlightAngle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotation);
+            
+            // Свечение
+            const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 1.5);
+            glowGradient.addColorStop(0, color.glow || 'rgba(0, 247, 255, 0.3)');
+            glowGradient.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = glowGradient;
+            ctx.beginPath();
+            ctx.arc(0, 0, size * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Основной кристалл (гексагональная призма)
+            const sides = 6;
+            const height = size * 1.5;
+            const radius = size;
+            
+            // Основание кристалла
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            for (let i = 0; i < sides; i++) {
+                const angle = (i / sides) * Math.PI * 2;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.closePath();
+            ctx.fill();
+            
+            // Боковые грани
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < sides; i++) {
+                const angle1 = (i / sides) * Math.PI * 2;
+                const angle2 = ((i + 1) % sides / sides) * Math.PI * 2;
+                
+                const x1 = Math.cos(angle1) * radius;
+                const y1 = Math.sin(angle1) * radius;
+                const x2 = Math.cos(angle2) * radius;
+                const y2 = Math.sin(angle2) * radius;
+                
+                // Боковая грань
+                ctx.fillStyle = `rgba(255, 255, 255, 0.1)`;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.lineTo(0, -height);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+            
+            // Верхушка кристалла
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(0, -height);
+            for (let i = 0; i < sides; i++) {
+                const angle = (i / sides) * Math.PI * 2;
+                const x = Math.cos(angle) * radius * 0.3;
+                const y = Math.sin(angle) * radius * 0.3 - height * 0.7;
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.closePath();
+            ctx.fill();
+            
+            // Блики на гранях
+            const highlightSize = size * 0.8;
+            const highlightX = Math.cos(highlightAngle) * size * 0.5;
+            const highlightY = Math.sin(highlightAngle) * size * 0.5 - height * 0.5;
+            
+            const highlightGradient = ctx.createRadialGradient(
+                highlightX, highlightY, 0, 
+                highlightX, highlightY, highlightSize
+            );
+            highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+            highlightGradient.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = highlightGradient;
+            ctx.beginPath();
+            ctx.arc(highlightX, highlightY, highlightSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+        
+        // Отрисовка игры
+        function draw() {
+            // Очистка canvas
+            ctx.fillStyle = 'rgba(10, 10, 26, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Рисуем туманности
+            nebulas.forEach(nebula => {
+                ctx.save();
+                ctx.translate(nebula.x, nebula.y);
+                ctx.rotate(nebula.rotation);
+                
+                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, nebula.radius);
+                gradient.addColorStop(0, nebula.color);
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(0, 0, nebula.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            });
+            
+            // Рисуем звезды
+            ctx.fillStyle = 'white';
+            stars.forEach(star => {
+                star.y += star.speed;
+                if (star.y > canvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * canvas.width;
+                }
+                
+                ctx.globalAlpha = star.alpha;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+            
+            // Рисуем кристаллы
+            crystals.forEach(crystal => {
+                drawCrystal(
+                    crystal.x, 
+                    crystal.y, 
+                    crystal.size, 
+                    crystal.color, 
+                    crystal.rotation,
+                    crystal.highlightAngle
+                );
+            });
+            
+            // Рисуем астероиды
+            asteroids.forEach(asteroid => {
+                ctx.save();
+                ctx.translate(asteroid.x, asteroid.y);
+                ctx.rotate(asteroid.rotation);
+                
+                // Основная форма
+                ctx.fillStyle = asteroid.color;
+                ctx.beginPath();
+                
+                asteroid.points.forEach((point, i) => {
+                    if (i === 0) {
+                    ctx.moveTo(point.x, point.y);
+                    } else {
+                    ctx.lineTo(point.x, point.y);
+                    }
+                });
+                
+                ctx.closePath();
+                ctx.fill();
+                
+                // Детали поверхности
+                ctx.fillStyle = asteroid.isDestroyable ? '#a0f7ff' : '#777';
+                for (let i = 0; i < 5; i++) {
+                    const x = (Math.random() - 0.5) * asteroid.size * 0.8;
+                    const y = (Math.random() - 0.5) * asteroid.size * 0.8;
+                    const size = 1 + Math.random() * 3;
+                    ctx.beginPath();
+                    ctx.arc(x, y, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Кратеры
+                ctx.fillStyle = asteroid.isDestroyable ? 'rgba(0, 100, 150, 0.3)' : 'rgba(0, 0, 0, 0.3)';
+                for (let i = 0; i < 3; i++) {
+                    const x = (Math.random() - 0.5) * asteroid.size * 0.6;
+                    const y = (Math.random() - 0.5) * asteroid.size * 0.6;
+                    const size = 3 + Math.random() * 5;
+                    ctx.beginPath();
+                    ctx.arc(x, y, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            });
+            
+            // Рисуем снежинку
+            if (specialSnowflake) {
+                ctx.save();
+                ctx.translate(specialSnowflake.x, specialSnowflake.y);
+                ctx.rotate(specialSnowflake.rotation);
+                ctx.globalAlpha = specialSnowflake.alpha;
+                
+                ctx.strokeStyle = '#00f7ff';
+                ctx.lineWidth = 1.5;
+                ctx.fillStyle = 'rgba(0, 247, 255, 0.2)';
+                
+                // Центральный круг
+                ctx.beginPath();
+                ctx.arc(0, 0, specialSnowflake.size * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Лучи
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(Math.cos(angle) * specialSnowflake.size, Math.sin(angle) * specialSnowflake.size);
+                    ctx.stroke();
+                    
+                    const sideAngle1 = angle + Math.PI/6;
+                    const sideAngle2 = angle - Math.PI/6;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(angle) * specialSnowflake.size * 0.5, Math.sin(angle) * specialSnowflake.size * 0.5);
+                    ctx.lineTo(Math.cos(sideAngle1) * specialSnowflake.size * 0.3, Math.sin(sideAngle1) * specialSnowflake.size * 0.3);
+                    ctx.stroke();
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(angle) * specialSnowflake.size * 0.5, Math.sin(angle) * specialSnowflake.size * 0.5);
+                    ctx.lineTo(Math.cos(sideAngle2) * specialSnowflake.size * 0.3, Math.sin(sideAngle2) * specialSnowflake.size * 0.3);
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+                ctx.globalAlpha = 1;
+            }
+            
+            // Рисуем игрока
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            
+            if (player.dx !== 0 || player.dy !== 0) {
+                ctx.rotate(Math.atan2(player.dy, player.dx) + Math.PI / 2);
+            }
+            
+            // Корпус корабля
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            
+            // Основная форма корабля
+            ctx.moveTo(0, -player.height/2);
+            ctx.lineTo(-player.width/3, -player.height/4);
+            ctx.lineTo(-player.width/2, player.height/4);
+            ctx.lineTo(-player.width/4, player.height/2);
+            ctx.lineTo(player.width/4, player.height/2);
+            ctx.lineTo(player.width/2, player.height/4);
+            ctx.lineTo(player.width/3, -player.height/4);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Детали корабля
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 1;
+            
+            // Кабина
+            ctx.beginPath();
+            ctx.arc(0, -player.height/6, player.width/6, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Панели
+            ctx.beginPath();
+            ctx.moveTo(-player.width/4, -player.height/8);
+            ctx.lineTo(-player.width/4, player.height/8);
+            ctx.moveTo(player.width/4, -player.height/8);
+            ctx.lineTo(player.width/4, player.height/8);
+            ctx.stroke();
+            
+            // Двигатель
+            if (player.enginePower > 0) {
+                const flameHeight = player.height/3 * player.enginePower;
+                const flameWidth = player.width/2 * player.enginePower;
+                
+                const gradient = ctx.createLinearGradient(0, player.height/2, 0, player.height/2 + flameHeight);
+                gradient.addColorStop(0, '#f7ff00');
+                gradient.addColorStop(0.5, '#ff9100');
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.moveTo(-player.width/4, player.height/2);
+                ctx.lineTo(0, player.height/2 + flameHeight);
+                ctx.lineTo(player.width/4, player.height/2);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Частицы пламени
+                for (let i = 0; i < 3; i++) {
+                    const offset = (Math.random() - 0.5) * player.width/4;
+                    const size = 2 + Math.random() * 3;
+                    
+                    ctx.fillStyle = `rgba(255, ${Math.floor(145 + Math.random() * 100)}, 0, ${0.5 + Math.random() * 0.5})`;
+                    ctx.beginPath();
+                    ctx.arc(offset, player.height/2 + flameHeight * (0.3 + Math.random() * 0.7), size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            ctx.restore();
+            
+            // Рисуем частицы
+            particles.forEach(p => {
+                ctx.globalAlpha = p.alpha;
+                
+                if (p.isCrystal) {
+                    // Рисуем частицы в форме маленьких кристаллов
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rotation);
+                    
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    
+                    // Простая форма кристалла для частиц
+                    ctx.moveTo(0, -p.crystalSize);
+                    ctx.lineTo(-p.crystalSize/2, 0);
+                    ctx.lineTo(0, p.crystalSize/2);
+                    ctx.lineTo(p.crystalSize/2, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.restore();
+                } else {
+                    // Обычные круглые частицы
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+            ctx.globalAlpha = 1;
+        }
+        
+        // Игровой цикл
+        function gameLoop(timestamp) {
+            if (!isPaused) {
+                update(timestamp);
+                draw();
+            }
+            animationId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Пауза игры
+        function pauseGame() {
+            isPaused = true;
+            pauseScreen.style.display = 'flex';
+            pauseButton.textContent = '▶';
+        }
+        
+        // Продолжение игры
+        function resumeGame() {
+            isPaused = false;
+            pauseScreen.style.display = 'none';
+            pauseButton.textContent = '⏸';
+            lastFrameTime = performance.now();
+        }
+        
+        // Начало игры
+        function startGame() {
+            score = 0;
+            scoreElement.textContent = score;
+            highScoreElement.textContent = highScore;
+            newRecordElement.style.display = 'none';
+            
+            crystals.length = 0;
+            asteroids.length = 0;
+            particles.length = 0;
+            specialSnowflake = null;
+            snowflakeSpawnTimer = 0;
+            
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            player.dx = 0;
+            player.dy = 0;
+            player.isMoving = false;
+            player.enginePower = 0;
+            
+            for (let i = 0; i < 3; i++) {
+                createCrystal();
+            }
+            
+            for (let i = 0; i < 2; i++) {
+                createAsteroid();
+            }
+            
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            pauseButton.style.display = 'block';
+            
+            gameRunning = true;
+            isPaused = false;
+            lastFrameTime = performance.now();
+            gameLoop(lastFrameTime);
+        }
+        
+        // Конец игры
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            pauseButton.style.display = 'none';
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('highScore', highScore);
+                highScoreElement.textContent = highScore;
+                newRecordElement.style.display = 'inline';
+            }
+            
+            finalScoreElement.textContent = score;
+            gameOverScreen.style.display = 'flex';
+            
+            for (let i = 0; i < 30; i++) {
+                createParticles(player.x, player.y, '#ff00f7', 1);
+            }
+            
+            if (freezeTimeLeft > 0) {
+                deactivateFreezeMode();
+            }
+        }
+        
+        // Обработчики событий
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', startGame);
+        pauseButton.addEventListener('click', () => {
+            if (isPaused) {
+                resumeGame();
+            } else {
+                pauseGame();
+            }
+        });
+        resumeButton.addEventListener('click', resumeGame);
+        
+        // Обработчики управления
+        canvas.addEventListener('mousedown', handleInputStart);
+        canvas.addEventListener('mousemove', handleInputMove);
+        canvas.addEventListener('mouseup', handleInputEnd);
+        canvas.addEventListener('mouseleave', handleInputEnd);
+        
+        canvas.addEventListener('touchstart', handleInputStart, { passive: false });
+        canvas.addEventListener('touchmove', handleInputMove, { passive: false });
+        canvas.addEventListener('touchend', handleInputEnd);
+        
+        // Обработчик изменения размера
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            if (gameRunning && !isPaused) {
+                player.x = canvas.width / 2;
+                player.y = canvas.height / 2;
+            }
+        });
+        
+        // Инициализация
+        createBackground();
+        expandTelegramWebApp();
+        draw();
+    </script>
+</body>
+</html>
